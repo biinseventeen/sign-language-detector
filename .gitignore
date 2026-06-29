@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+
+# Data & models (không commit lên git)
+data/
+dataset/
+*.pth
+*.zip
+*.csv
+
+# Logs
+wandb/
+runs/
+logs/
+*.log
+
+# Jupyter
+.ipynb_checkpoints/
+
+# IDE
+.vscode/
+.idea/
+
+# Môi trường
+.env
