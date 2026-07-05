@@ -36,12 +36,13 @@ TARGET_FRAMES  = 8
 IMG_SIZE       = 224
 
 # ── Paths ──────────────────────────────────────────────────────────────────
-BASE_PATH          = 'your/path/here'
-DATASET_ZIP        = os.path.join(BASE_PATH, 'dataset.zip')
-LOCAL_EXTRACT_PATH = '/content/dataset_local'
-TRAIN_ROOT         = '/content/dataset_local/dataset/train'
-LABEL_MAP_PATH     = os.path.join(LOCAL_EXTRACT_PATH, 'dataset/label_mapping.pkl')
-SAVE_PATH          = 'best_model_timesformer.pth'
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+BASE_PATH          = PROJECT_ROOT
+LOCAL_EXTRACT_PATH = os.path.join(PROJECT_ROOT, 'dataset_local')          # chỉ dùng khi train (dataset video)
+TRAIN_ROOT         = os.path.join(LOCAL_EXTRACT_PATH, 'dataset', 'train')  # chỉ dùng khi train
+LABEL_MAP_PATH     = os.path.join(PROJECT_ROOT, 'label_mapping.pkl')      # nằm ở gốc project
+SAVE_PATH          = os.path.join(PROJECT_ROOT, 'best_model_timesformer.pth')
 
 # ── Training hyperparams ───────────────────────────────────────────────────
 BATCH_SIZE         = 8    
