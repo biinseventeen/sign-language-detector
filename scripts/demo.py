@@ -13,19 +13,17 @@ from src.model import TimeSformerClassifier
 from src.utils import seed_everything
 import pickle
 
-# ------------------- Cấu hình cho phần "đứng yên để dự đoán" (chế độ webcam) -------------------
+# ------------------- wehcam mode -------------------
 MOTION_THRESHOLD    = 4.0
 STILLNESS_DURATION  = 0.8
 MIN_RECORD_SECONDS  = 0.5
 MAX_RECORD_SECONDS  = 6.0
 
-# ------------------- Cấu hình cửa sổ hiển thị -------------------
 CAPTURE_WIDTH  = 640
 CAPTURE_HEIGHT = 480
 DISPLAY_WIDTH  = 480
 WINDOW_NAME    = "Sign Language Demo"
 
-# ------------------- Kiểm tra model và train nếu cần -------------------
 if not os.path.exists(SAVE_PATH):
     print(f"{SAVE_PATH} not found, training activated...")
     os.environ['WANDB_MODE'] = 'disabled'
@@ -47,9 +45,7 @@ idx_to_label = {v: k for k, v in label_mapping.items()}
 
 
 # =============================================================================
-# CÁC HÀM DÙNG CHUNG CHO CẢ 2 CHẾ ĐỘ (webcam & video input)
-# Quan trọng: dùng đúng 1 bộ logic sampling + normalize cho cả 2 chế độ,
-# và khớp với src/dataset.py lúc train, để tránh lệch phân bố dữ liệu.
+# SHARE MODE
 # =============================================================================
 
 def sample_frames_uniform(frames_list, target_frames=TARGET_FRAMES):
@@ -120,7 +116,7 @@ def resize_keep_ratio(frame, target_w, target_h):
     return canvas
 
 # =============================================================================
-# CHẾ ĐỘ 1: DỰ ĐOÁN TỪ FILE VIDEO CÓ SẴN (kèm phát lại/replay)
+# VIDEO MODE
 # =============================================================================
 
 def pick_video_file():
@@ -224,7 +220,7 @@ def run_video_mode():
 
 
 # =============================================================================
-# CHẾ ĐỘ 2: WEBCAM TRỰC TIẾP (ghi động tác -> đứng yên -> tự dự đoán)
+# WEBCAM MODE
 # =============================================================================
 
 STATE_IDLE = 'idle'
@@ -335,7 +331,7 @@ def run_webcam_mode():
     cv2.destroyWindow(WINDOW_NAME)
     
 # =============================================================================
-# MÀN HÌNH CHỌN CHẾ ĐỘ
+# MENU
 # =============================================================================
 
 def run_mode_selector():
