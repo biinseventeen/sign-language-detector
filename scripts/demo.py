@@ -1,7 +1,7 @@
 # demo.py
 import os
 import time
-import cv2
+import cv2 # type: ignore
 import torch
 import numpy as np
 from src.config import (

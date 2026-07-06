@@ -78,7 +78,8 @@ def train_phase(
         val_loss, val_metrics  = validate(model, val_loader, criterion, device)
         scheduler.step()
 
-        wandb.log({
+        #WANDB
+        '''wandb.log({
             'phase':        phase_name,
             'epoch':        epoch + 1,
             'train_loss':   train_loss,
@@ -87,7 +88,7 @@ def train_phase(
             'val_precision':val_metrics['precision'],
             'val_recall':   val_metrics['recall'],
             'lr':           optimizer.param_groups[0]['lr'],
-        })
+        })'''
 
         print(f"Val F1: {val_metrics['f1']:.2f}% | "
               f"Precision: {val_metrics['precision']:.2f}% | "

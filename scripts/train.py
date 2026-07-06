@@ -59,7 +59,8 @@ def build_dataloaders():
 def main():
     seed_everything(SEED)
 
-    wandb.login()
+    #WANDB
+    '''wandb.login()
     wandb.init(
         project=WANDB_PROJECT,
         entity=WANDB_ENTITY,
@@ -72,7 +73,7 @@ def main():
             'lr_head':       LR_HEAD,
             'epochs':        EPOCHS,
         }
-    )
+    )'''
 
     train_loader, val_loader = build_dataloaders()
 
@@ -87,7 +88,9 @@ def main():
     )
 
     print(f'Best F1: {best_f1:.2f}%')
-    wandb.finish()
+    
+    #WANDB
+    #wandb.finish()
 
 
 if __name__ == '__main__':

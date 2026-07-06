@@ -53,6 +53,6 @@ EPOCHS      = 10
 IMAGENET_MEAN      = [0.45, 0.45, 0.45]  
 IMAGENET_STD       = [0.225, 0.225, 0.225]
 
-# ── WandB ──────────────────────────────────────────────────────────────────
+# ── WandB (OPTIONAL) ──────────────────────────────────────────────────────────────────
 WANDB_PROJECT = 'sign-language-detector'
 WANDB_ENTITY  = 'your-workspace'
