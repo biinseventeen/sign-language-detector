@@ -28,7 +28,7 @@ sign-language-detector/
 │   ├── train.py                # Training loop functions
 │   └── utils.py                # Helper functions and utilities
 ├── .gitignore
-├── best_model_timesformer.pth  # Pre-trained model weights
+├── best_model_timesformer.pth  # Pre-trained model weights (not available in repo due to large size)
 ├── label_mapping.pkl           # Mapping of 100 classes to their Vietnamese labels
 ├── LICENSE                     # MIT License
 ├── README.md                   
