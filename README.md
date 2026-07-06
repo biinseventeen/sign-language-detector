@@ -83,7 +83,7 @@ python scripts/evaluate.py
 # To train the model from scratch
 python scripts/train.py
 ```
-**Note:** The WandB is used for better illustration of training and not at all affect the outcome of this repository. Therefore,  some code that related to WandB are turned off by using comments. If you want to use it, remove all comments with ```#WANDB``` before them. and change ```WANDB_ENTITY  = 'your-workspace'``` in ```src/config.py``` to your actual workspace in WandB.
+**Note:** The WandB is used for better illustration of training and not at all affect the outcome of this repository. Therefore,  some code that related to WandB are turned off by using comments. If you want to use it, remove all comments with ```#WANDB``` before them, and change ```WANDB_ENTITY  = 'your-workspace'``` in ```src/config.py``` to your actual workspace in WandB.
 
 ## 📄 License
 
