@@ -1,6 +1,6 @@
 # Vietnamese Sign Language Detector
 
-This repository contains the source code for a 100-class Vietnamese Sign Language classification project. It was developed as part of the **Vietnam Collegiate Olympiad in Artificial Intelligence 2025 (Selection Round). 
+This repository contains the source code for a 100-class Vietnamese Sign Language classification project. It was developed as part of the **Vietnam Collegiate Olympiad in Artificial Intelligence 2025 (Selection Round)**. 
 
 The core architecture utilizes **TimeSformer** (Time-Space Transformer) combined with various data augmentation techniques to accurately recognize and classify sign language vocabulary from video sequences.
 
