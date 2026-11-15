@@ -1,386 +1,241 @@
-# demo.py
+﻿"""Streamlit interface for Vietnamese sign language video classification."""
+
 import os
-import time
-import cv2 # type: ignore
-import torch
-import numpy as np
-from src.config import (
-    DEVICE, SAVE_PATH, IMAGENET_MEAN, IMAGENET_STD,
-    TARGET_FRAMES, IMG_SIZE, NUM_CLASSES, LABEL_MAP_PATH,
-    SEED
+import sys
+import tempfile
+from pathlib import Path
+
+import streamlit as st
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+st.set_page_config(
+    page_title="Nhận diện ngôn ngữ ký hiệu",
+    page_icon="🤟",
+    layout="wide",
+    initial_sidebar_state="collapsed",
 )
-from src.model import TimeSformerClassifier
-from src.utils import seed_everything
-import pickle
 
-# ------------------- wehcam mode -------------------
-MOTION_THRESHOLD    = 4.0
-STILLNESS_DURATION  = 0.8
-MIN_RECORD_SECONDS  = 0.5
-MAX_RECORD_SECONDS  = 6.0
-
-CAPTURE_WIDTH  = 640
-CAPTURE_HEIGHT = 480
-DISPLAY_WIDTH  = 480
-WINDOW_NAME    = "Sign Language Demo"
-
-if not os.path.exists(SAVE_PATH):
-    print(f"{SAVE_PATH} not found, training activated...")
-    os.environ['WANDB_MODE'] = 'disabled'
-    from scripts.train import main as train_main
-    train_main()
-    print("Training completed, continuing demo.")
-
-# ------------------- Load model -------------------
-seed_everything(SEED)
-model = TimeSformerClassifier(num_classes=NUM_CLASSES).to(DEVICE)
-model.load_state_dict(torch.load(SAVE_PATH, map_location=DEVICE))
-model.eval()
-print(f"Model loaded from {SAVE_PATH}")
-
-# ------------------- Load label mapping -------------------
-with open(LABEL_MAP_PATH, 'rb') as f:
-    label_mapping = pickle.load(f)
-idx_to_label = {v: k for k, v in label_mapping.items()}
-
-
-# =============================================================================
-# SHARE MODE
-# =============================================================================
-
-def sample_frames_uniform(frames_list, target_frames=TARGET_FRAMES):
+st.markdown(
     """
-    frames_list: list các frame BGR (np.ndarray) độ dài T bất kỳ.
-    Lấy đều target_frames điểm từ đầu đến cuối clip
-    -- giống hệt VideoDataset._sample_frames() lúc train.
-    """
-    T = len(frames_list)
-    if T == target_frames:
-        return frames_list
-    if T < target_frames:
-        pad = target_frames - T
-        return frames_list + [frames_list[-1]] * pad
-    idx = np.linspace(0, T - 1, target_frames).astype(int)
-    return [frames_list[i] for i in idx]
+    <style>
+      html, body, [class*="css"] { font-family: "Segoe UI", Arial, sans-serif; }
+      .stApp { background: #f3f6fb; color: #24364b; }
+      .block-container { max-width: 1100px; padding-top: 2rem; padding-bottom: 3rem; }
+      .stMarkdown, [data-testid="stMarkdownContainer"] { color: #34465d; }
+      [data-testid="stMarkdownContainer"] h1,
+      [data-testid="stMarkdownContainer"] h2,
+      [data-testid="stMarkdownContainer"] h3,
+      [data-testid="stMarkdownContainer"] h4 { color: #173b5e !important; }
+      .hero { padding: 2rem 2.2rem; border-radius: 24px; color: white;
+        background: linear-gradient(120deg, #123c69 0%, #1b6ca8 58%, #35a7a0 100%);
+        box-shadow: 0 16px 38px rgba(20, 65, 105, .18); margin-bottom: 1.5rem; }
+      .hero h1 { color: white !important; font-size: 2.1rem; margin: .3rem 0 .5rem; }
+      .hero p { color: #e3f2ff !important; font-size: 1rem; margin: 0; }
+      .eyebrow { color: #b9f2e8; font-size: .78rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+      .panel { padding: 1.35rem 1.5rem; background: white; border: 1px solid #e8edf4;
+        border-radius: 18px; box-shadow: 0 5px 18px rgba(25, 50, 80, .045); margin-bottom: 1rem; }
+      .panel h3 { color: #173b5e !important; margin: 0 0 .25rem; }
+      .muted { color: #68788c !important; }
+      .feature-card { height: 100%; padding: 1rem 1.15rem; border-radius: 16px;
+        background: white; border: 1px solid #e5ebf3; box-shadow: 0 5px 18px rgba(25, 50, 80, .04); }
+      .feature-card strong { display: block; color: #173b5e; font-size: 1rem; margin-bottom: .25rem; }
+      .feature-card span { color: #718096; font-size: .88rem; }
+      [data-testid="stFileUploader"] { background: white; border: 1px solid #e2e8f0;
+        border-radius: 16px; padding: .8rem 1rem; }
+      [data-testid="stFileUploader"] section { background: #f7faff !important;
+        border: 1px dashed #a9c1dd !important; border-radius: 12px !important; }
+      [data-testid="stFileUploader"] * { color: #34465d !important; }
+      [data-testid="stFileUploader"] button { background: white !important;
+        border: 1px solid #cbd8e7 !important; color: #173b5e !important; }
+      div.stButton > button { border-radius: 12px; font-weight: 700; min-height: 3rem;
+        border: 0; background: linear-gradient(105deg, #175b9a, #258d9d); color: white; }
+      div.stButton > button:hover { background: linear-gradient(105deg, #124a80, #1b7482); color: white; }
+    </style>
+<section class="hero">
+      <div class="eyebrow">AI · SIGN LANGUAGE</div>
+      <h1>Nhận diện ngôn ngữ ký hiệu</h1>
+      <p>Tải video lên để mô hình phân loại ký hiệu tiếng Việt.</p>
+    </section>
+    """,
+    unsafe_allow_html=True,
+)
 
 
-def preprocess_frames(frames_list):
-    """
-    frames_list: list of np.ndarray (H, W, 3) uint8 BGR, length = TARGET_FRAMES
-    (đã qua sample_frames_uniform)
-    Trả về tensor (1, T, C, H, W) đã normalize, sẵn sàng cho model.
-    """
-    processed = []
-    for frame in frames_list:
-        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        frame_resized = cv2.resize(frame_rgb, (IMG_SIZE, IMG_SIZE))
-        processed.append(frame_resized)
-    frames = np.stack(processed, axis=0)
-    frames = torch.from_numpy(frames).float()
-    frames = frames.permute(0, 3, 1, 2) / 255.0
+def load_inference_assets():
+    """Load heavy ML dependencies and model only when inference is requested."""
+    import pickle
+
+    import torch
+    from src.config import DEVICE, LABEL_MAP_PATH, NUM_CLASSES, SAVE_PATH
+    from src.model import TimeSformerClassifier
+
+    if not os.path.exists(SAVE_PATH):
+        raise FileNotFoundError(
+            "Chưa tìm thấy best_model_timesformer.pth. Hãy huấn luyện mô hình "
+            "bằng `python scripts/train.py` trước khi dùng demo."
+        )
+    if not os.path.exists(LABEL_MAP_PATH):
+        raise FileNotFoundError("Không tìm thấy tệp label_mapping.pkl trong thư mục project.")
+
+    model = TimeSformerClassifier(num_classes=NUM_CLASSES).to(DEVICE)
+    model.load_state_dict(torch.load(SAVE_PATH, map_location=DEVICE))
+    model.eval()
+    with open(LABEL_MAP_PATH, "rb") as label_file:
+        label_mapping = pickle.load(label_file)
+    return model, {index: label for label, index in label_mapping.items()}, DEVICE
+
+
+@st.cache_resource(show_spinner=False)
+def get_inference_assets():
+    return load_inference_assets()
+
+
+def read_sampled_frames(video_bytes, filename, target_frames):
+    """Read only uniformly spaced frames to avoid holding the whole video in memory."""
+    import cv2
+    import numpy as np
+
+    suffix = Path(filename).suffix.lower() or ".mp4"
+    temp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as temp_file:
+            temp_file.write(video_bytes)
+            temp_path = temp_file.name
+
+        capture = cv2.VideoCapture(temp_path)
+        if not capture.isOpened():
+            raise ValueError("Không thể mở video. Hãy thử tệp MP4, AVI, MOV hoặc MKV khác.")
+
+        frame_count = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
+        if frame_count <= 0:
+            capture.release()
+            raise ValueError("Không đọc được khung hình từ video này.")
+
+        indices = np.linspace(0, frame_count - 1, target_frames).astype(int)
+        frames = []
+        for frame_index in indices:
+            capture.set(cv2.CAP_PROP_POS_FRAMES, int(frame_index))
+            ok, frame = capture.read()
+            if ok:
+                frames.append(frame)
+        capture.release()
+
+        if not frames:
+            raise ValueError("Video không có khung hình đọc được.")
+        while len(frames) < target_frames:
+            frames.append(frames[-1])
+        return frames
+    finally:
+        if temp_path and os.path.exists(temp_path):
+            os.remove(temp_path)
+
+
+@st.cache_data(show_spinner=False)
+def make_preview_sheet(video_bytes, filename):
+    """Build a browser-safe contact sheet from frames decoded by OpenCV."""
+    from io import BytesIO
+
+    from PIL import Image
+
+    frames = read_sampled_frames(video_bytes, filename, target_frames=8)
+    tile_width, tile_height = 320, 180
+    gap = 12
+    sheet = Image.new(
+        "RGB",
+        (tile_width * 2 + gap * 3, tile_height * 4 + gap * 5),
+        "#e8eef5",
+    )
+    for index, frame in enumerate(frames):
+        rgb_frame = Image.fromarray(frame[:, :, ::-1].copy())
+        rgb_frame.thumbnail((tile_width, tile_height), Image.Resampling.LANCZOS)
+        tile = Image.new("RGB", (tile_width, tile_height), "#142235")
+        x_offset = (tile_width - rgb_frame.width) // 2
+        y_offset = (tile_height - rgb_frame.height) // 2
+        tile.paste(rgb_frame, (x_offset, y_offset))
+        x = gap + (index % 2) * (tile_width + gap)
+        y = gap + (index // 2) * (tile_height + gap)
+        sheet.paste(tile, (x, y))
+
+    output = BytesIO()
+    sheet.save(output, format="PNG", optimize=True)
+    return output.getvalue()
+
+
+def classify_video(video_bytes, filename):
+    import cv2
+    import numpy as np
+    import torch
+    from src.config import IMAGENET_MEAN, IMAGENET_STD, IMG_SIZE, TARGET_FRAMES
+
+    model, index_to_label, device = get_inference_assets()
+    sampled_frames = read_sampled_frames(video_bytes, filename, TARGET_FRAMES)
+    processed_frames = []
+    for frame in sampled_frames:
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        frame = cv2.resize(frame, (IMG_SIZE, IMG_SIZE))
+        processed_frames.append(frame)
+
+    tensor = torch.from_numpy(np.stack(processed_frames)).float()
+    tensor = tensor.permute(0, 3, 1, 2) / 255.0
     mean = torch.tensor(IMAGENET_MEAN).view(1, 3, 1, 1)
     std = torch.tensor(IMAGENET_STD).view(1, 3, 1, 1)
-    frames = (frames - mean) / std
-    return frames.unsqueeze(0).to(DEVICE)
+    tensor = ((tensor - mean) / std).unsqueeze(0).to(device)
+
+    with torch.no_grad():
+        probabilities = torch.softmax(model(tensor), dim=1)[0]
+        predicted_index = int(probabilities.argmax().item())
+    return index_to_label[predicted_index], float(probabilities[predicted_index].item())
 
 
-@torch.no_grad()
-def predict(model, frames_tensor):
-    outputs = model(frames_tensor)
-    probs = torch.softmax(outputs, dim=1)
-    pred_idx = outputs.argmax(1).item()
-    confidence = probs[0, pred_idx].item()
-    label = idx_to_label[pred_idx]
-    return label, confidence
+feature_a, feature_b, feature_c = st.columns(3, gap="medium")
+with feature_a:
+    st.markdown('<div class="feature-card"><strong>100 lớp ký hiệu</strong><span>Phân loại từ vựng tiếng Việt</span></div>', unsafe_allow_html=True)
+with feature_b:
+    st.markdown('<div class="feature-card"><strong>8 khung hình</strong><span>Lấy mẫu xuyên suốt video</span></div>', unsafe_allow_html=True)
+with feature_c:
+    st.markdown('<div class="feature-card"><strong>Thao tác đơn giản</strong><span>Tải video lên và nhận kết quả</span></div>', unsafe_allow_html=True)
 
+st.markdown('<div class="panel"><h3>①  Tải video lên</h3><p class="muted">Chọn video rõ nét, có đầy đủ động tác ký hiệu. Hỗ trợ MP4, AVI, MOV và MKV.</p></div>', unsafe_allow_html=True)
+uploaded_video = st.file_uploader(
+    "Chọn tệp video",
+    type=["mp4", "avi", "mov", "mkv"],
+    label_visibility="collapsed",
+)
 
-def draw_banner(display, lines, color=(0, 255, 0)):
-    h, w, _ = display.shape
-    banner_h = 34 + 26 * len(lines)
-    cv2.rectangle(display, (8, 8), (w - 8, 8 + banner_h), (0, 0, 0), -1)
-    for i, line in enumerate(lines):
-        cv2.putText(display, line, (16, 32 + 26 * i),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.55, color, 1)
-
-
-def resize_keep_ratio(frame, target_w, target_h):
-    """Resize giữ nguyên tỉ lệ khung hình, thêm viền đen nếu cần (letterbox)."""
-    h, w = frame.shape[:2]
-    scale = min(target_w / w, target_h / h)
-    new_w, new_h = int(w * scale), int(h * scale)
-    resized = cv2.resize(frame, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
-    canvas = np.zeros((target_h, target_w, 3), dtype=np.uint8)
-    y_off = (target_h - new_h) // 2
-    x_off = (target_w - new_w) // 2
-    canvas[y_off:y_off + new_h, x_off:x_off + new_w] = resized
-    return canvas
-
-# =============================================================================
-# VIDEO MODE
-# =============================================================================
-
-def pick_video_file():
-    """Mở hộp thoại chọn file bằng tkinter. Trả về đường dẫn, hoặc None nếu huỷ."""
-    import tkinter as tk
-    from tkinter import filedialog
-    root = tk.Tk()
-    root.withdraw()
-    root.attributes('-topmost', True)
-    path = filedialog.askopenfilename(
-        title="Selecting video",
-        filetypes=[("Video files", "*.mp4 *.avi *.mov *.mkv"), ("All files", "*.*")]
-    )
-    root.destroy()
-    return path if path else None
-
-
-def run_video_mode():
-    video_path = pick_video_file()
-    if not video_path:
-        print("Video selection cancelled, returning to menu.")
-        return
-
-    if not os.path.exists(video_path):
-        print(f"[ERROR] File not found: {video_path}")
-        return
-
-    # ---- Đọc toàn bộ video, sample đều, và dự đoán MỘT LẦN ----
-    cap = cv2.VideoCapture(video_path)
-    if not cap.isOpened():
-        print(f"[ERROR] Cannot open file: {video_path}")
-        return
-
-    all_frames = []
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
-        all_frames.append(frame)
-
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    cap.release()
-    if fps <= 0 or fps > 120:
-        fps = 30
-    delay_ms = max(1, int(1000 / fps))
-
-    if not all_frames:
-        print(f"[Error] Cannot read video's content: {video_path}")
-        return
-
-    sampled = sample_frames_uniform(all_frames, TARGET_FRAMES)
-    frames_tensor = preprocess_frames(sampled)
-    label_name, confidence = predict(model, frames_tensor)
-    conf_pct = confidence * 100
-
-    print('\n' + '=' * 50)
-    print(f'Video     : {os.path.basename(video_path)}')
-    print(f'Label     : {label_name}')
-    print(f'Confidence: {conf_pct:.2f}%')
-    print(f'So frame goc: {len(all_frames)} | Sample con lai: {len(sampled)}')
-    print('=' * 50)
-
-    # ---- Phát lại video, có replay ('r') và quay lại menu ('m') ----
-    print(">> Video playing. Press 'r' to replay, 'm' to return to menu, 'e' to exit.")
-
-    cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
-    cv2.resizeWindow(WINDOW_NAME, DISPLAY_WIDTH, int(DISPLAY_WIDTH * 9 / 16))
-
-    frame_idx = 0
-    total_frames = len(all_frames)
-
-    while True:
-        frame = all_frames[frame_idx].copy()
-        display = resize_keep_ratio(frame, DISPLAY_WIDTH, int(DISPLAY_WIDTH * 9 / 16))
-
-        text = f"{label_name} ({conf_pct:.1f}%)"
-        cv2.putText(display, text, (16, 36), cv2.FONT_HERSHEY_SIMPLEX,
-                    0.8, (0, 0, 0), 3, cv2.LINE_AA)
-        cv2.putText(display, text, (16, 36), cv2.FONT_HERSHEY_SIMPLEX,
-                    0.8, (0, 255, 0), 1, cv2.LINE_AA)
-
-        frame_idx += 1
-        if frame_idx >= total_frames:
-            draw_banner(display, [
-                "Video ended - 'r': replay, 'm': return to menu, 'e': exit"
-            ], color=(0, 255, 255))
-            cv2.imshow(WINDOW_NAME, display)
-            key = cv2.waitKey(0) & 0xFF
-        else:
-            cv2.imshow(WINDOW_NAME, display)
-            key = cv2.waitKey(delay_ms) & 0xFF
-
-        if key == ord('e'):
-            cv2.destroyAllWindows()
-            raise SystemExit
-        elif key == ord('m'):
-            cv2.destroyWindow(WINDOW_NAME)
-            return
-        elif key == ord('r'):
-            frame_idx = 0
-
-
-# =============================================================================
-# WEBCAM MODE
-# =============================================================================
-
-STATE_IDLE = 'idle'
-STATE_CAPTURING = 'capturing'
-STATE_RESULT = 'result'
-
-def run_webcam_mode():
-    cap = cv2.VideoCapture(0)
-    if not cap.isOpened():
-        print("Cannot turn on webcam.")
-        return
-
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, CAPTURE_WIDTH)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, CAPTURE_HEIGHT)
-
-    cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
-    display_height_init = int(CAPTURE_HEIGHT * (DISPLAY_WIDTH / CAPTURE_WIDTH))
-    cv2.resizeWindow(WINDOW_NAME, DISPLAY_WIDTH, display_height_init)
-
-    state = STATE_IDLE
-    recorded_frames = []
-    prev_gray = None
-    start_time = 0.0
-    last_motion_time = 0.0
-    pred_label = ""
-    confidence = 0.0
-
-    print("Press 'q' to start recording, 'r' to retry, 'm' to return to menu, and 'e' to exit.")
-
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            print("Cant read video.")
-            break
-
-        display = frame.copy()
-        key = cv2.waitKey(1) & 0xFF
-
-        if key == ord('e'):
-            cap.release()
-            cv2.destroyAllWindows()
-            raise SystemExit
-        if key == ord('m'):
-            break  # thoát hàm, quay lại menu chọn chế độ
-
-        if state == STATE_IDLE:
-            draw_banner(display, ["Press 'q' to start recording"], color=(255, 255, 0))
-            if key == ord('q'):
-                state = STATE_CAPTURING
-                recorded_frames = []
-                prev_gray = None
-                start_time = time.time()
-                last_motion_time = time.time()
-
-        elif state == STATE_CAPTURING:
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            gray = cv2.GaussianBlur(gray, (21, 21), 0)
-
-            if prev_gray is not None:
-                diff = cv2.absdiff(gray, prev_gray)
-                motion_score = float(np.mean(diff))
-                if motion_score > MOTION_THRESHOLD:
-                    last_motion_time = time.time()
-            prev_gray = gray
-
-            recorded_frames.append(frame.copy())
-
-            now = time.time()
-            elapsed = now - start_time
-            still_duration = now - last_motion_time
-
-            draw_banner(display, [
-                "Recording... ",
-                f"Num of frames recorded: {len(recorded_frames)}",
-                f"Standstill: {still_duration:.1f}s / {STILLNESS_DURATION:.1f}s"
-            ], color=(0, 255, 255))
-
-            reached_min_time = elapsed >= MIN_RECORD_SECONDS
-            is_still_enough = still_duration >= STILLNESS_DURATION
-            reached_max_time = elapsed >= MAX_RECORD_SECONDS
-
-            if (reached_min_time and is_still_enough) or reached_max_time:
-                sampled = sample_frames_uniform(recorded_frames, TARGET_FRAMES)
-                frames_tensor = preprocess_frames(sampled)
-                pred_label, confidence = predict(model, frames_tensor)
-                state = STATE_RESULT
-
-        elif state == STATE_RESULT:
-            draw_banner(display, [
-                f"Result: {pred_label} ({confidence*100:.1f}%)",
-                f"(From {len(recorded_frames)} frames)",
-                "'r': re-predicting | 'm': menu | 'e': exit"
-            ], color=(0, 255, 0))
-
-            if key == ord('r'):
-                state = STATE_CAPTURING
-                recorded_frames = []
-                prev_gray = None
-                start_time = time.time()
-                last_motion_time = time.time()
-
-        h, w = display.shape[:2]
-        scale = DISPLAY_WIDTH / w
-        display_resized = cv2.resize(display, (DISPLAY_WIDTH, int(h * scale)))
-        cv2.imshow(WINDOW_NAME, display_resized)
-
-    cap.release()
-    cv2.destroyWindow(WINDOW_NAME)
-    
-# =============================================================================
-# MENU
-# =============================================================================
-
-def run_mode_selector():
-    canvas = np.zeros((280, 560, 3), dtype=np.uint8)
-    cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
-    cv2.resizeWindow(WINDOW_NAME, 560, 280)
-
-    lines = [
-        ("Sign Language Demo", (255, 255, 255), 1.0),
-        ("", (0, 0, 0), 0.1),
-        ("Press 'v': VIDEO MODE - Prediction from pre-recorded video", (0, 255, 255), 0.7),
-        ("Press 'w' : WEBCAM MODE - Prediction using webcam", (0, 255, 255), 0.7),
-        ("Press 'e' : EXIT", (0, 255, 255), 0.7),
-    ]
-
-    while True:
-        frame = canvas.copy()
-        y = 50
-        for text, color, scale in lines:
-            if text:
-                cv2.putText(frame, text, (30, y), cv2.FONT_HERSHEY_SIMPLEX,
-                            scale, color, 2 if scale >= 1.0 else 1, cv2.LINE_AA)
-            y += 45
-        cv2.imshow(WINDOW_NAME, frame)
-
-        key = cv2.waitKey(30) & 0xFF
-        if key == ord('e'):
-            cv2.destroyAllWindows()
-            return None
-        elif key == ord('v'):
-            return 'video'
-        elif key == ord('w'):
-            return 'webcam'
-
-
-def main():
-    while True:
-        mode = run_mode_selector()
-        if mode is None:
-            break
+if uploaded_video is not None:
+    video_bytes = uploaded_video.getvalue()
+    left, right = st.columns([1.25, 0.75], gap="large")
+    with left:
+        st.markdown('<div class="panel"><h3>②  Xem trước video</h3><p class="muted">Một số khung hình được lấy từ đầu đến cuối clip.</p></div>', unsafe_allow_html=True)
         try:
-            if mode == 'video':
-                run_video_mode()
-            elif mode == 'webcam':
-                run_webcam_mode()
-        except SystemExit:
-            break
-    cv2.destroyAllWindows()
+            st.image(make_preview_sheet(video_bytes, uploaded_video.name), use_container_width=True)
+        except Exception as error:
+            st.warning(f"Chưa thể tạo ảnh xem trước: {error}")
+    with right:
+        st.markdown('<div class="panel"><h3>③  Nhận diện ký hiệu</h3><p class="muted">Mô hình phân tích các khung hình và trả về nhãn dự đoán kèm độ tin cậy.</p></div>', unsafe_allow_html=True)
+        st.caption(f"Tệp đã chọn: {uploaded_video.name}")
+        run_prediction = st.button("🤟  Nhận diện ký hiệu", type="primary", use_container_width=True)
 
+    if run_prediction:
+        st.session_state.pop("prediction_result", None)
+        try:
+            with st.spinner("Đang tải mô hình và phân tích video… lần đầu có thể mất thêm chút thời gian."):
+                label, confidence = classify_video(video_bytes, uploaded_video.name)
+            st.session_state["prediction_result"] = {
+                "filename": uploaded_video.name,
+                "label": label,
+                "confidence": confidence,
+            }
+        except Exception as error:
+            st.error(str(error))
 
-if __name__ == "__main__":
-    main()
+    result = st.session_state.get("prediction_result")
+    if result and result["filename"] == uploaded_video.name:
+        st.markdown('<div class="panel"><div class="muted">Kết quả dự đoán</div></div>', unsafe_allow_html=True)
+        st.subheader(result["label"])
+        st.progress(result["confidence"], text=f'Độ tin cậy: {result["confidence"]:.1%}')
+else:
+    st.info("Chọn một video ở trên để xem trước và bắt đầu nhận diện.")

@@ -16,7 +16,7 @@ The model has been evaluated on the AI Challenge platform and achieved the follo
 sign-language-detector/
 ├── scripts/                    # Executable scripts for running tasks
 │   ├── __init__.py
-│   ├── demo.py                 # Interactive demo script (Webcam/Video)
+│   ├── demo.py                 # Streamlit video classification interface
 │   ├── evaluate.py             # Script for model evaluation
 │   └── train.py                # Script to start training
 ├── src/                        # Core source code modules
@@ -62,15 +62,14 @@ To run the training and evaluation scripts, you must first download the dataset 
 
 ### 1. Running the Demo
 
-The project includes an interactive demo script that supports two modes: **Webcam real-time detection** and **Video file prediction**. 
-
-To launch the demo, simply run the script. An interactive menu will appear in the console allowing you to select your preferred mode without needing to pass terminal arguments:
+The demo provides a Vietnamese web interface for uploading a pre-recorded video and predicting its sign language class. Install the dependencies, then start Streamlit:
 
 ```bash
-python scripts/demo.py
+pip install -r requirements.txt
+streamlit run scripts/demo.py
 ```
-* **Mode 1 (Video Path):** You will be prompted to enter the absolute or relative path to a `.mp4` video file.
-* **Mode 2 (Webcam):** The system will open your default camera and perform real-time sign language recognition.
+
+Open the local URL shown in the terminal, upload an `.mp4`, `.avi`, `.mov`, or `.mkv` file, and click **Nhận diện ký hiệu**. The page previews the video and displays the predicted label and confidence. The model loads only when you request a prediction and stays cached while the app is running. If `best_model_timesformer.pth` is missing, train the model first using the instructions below.
 
 ### 2. Training and Evaluation
 
